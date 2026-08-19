@@ -1,0 +1,37 @@
+{
+  "summary": "Comprehensive backend + smoke frontend testing for DIGITAL EDUCATION PROGRAM. Wrote 43 pytest cases covering auth (5 roles), RBAC, year separation, students CRUD, bulk upload workflow (validate + errors + import + history + export), attendance sheet/save/low, courses+assign+progress update, promotion, masters CRUD, users, audit logs, 16 reports + Excel/PDF exports, dashboard KPIs and year comparison. All 43 tests pass (100%). Frontend smoke: admin dashboard shows 13 KPI cards + charts, global year selector present, Students/Reports pages have all required data-testids, Student role redirects to /my and cannot open /students or /users, mobile bottom nav (5 items) renders at 390x844.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/audit-logs", "issue": "Was returning 500 because audit records had nested MongoDB ObjectId inside new_value (insert_one mutates dict adding _id). FIXED by stripping _id recursively in audit() writes and read endpoint."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "KPI card", "issue": "One KPI 'kpi-avg-progress-pct' data-testid not found (card exists in UI as 'AVG COURSE PROGRESS' but different testid used). Verify testid naming matches spec.", "selector": "[data-testid=\"kpi-avg-progress-pct\"]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Top header + sidebar brand", "issues": ["'DIGITAL EDUCATION PROGRAM' text visually overlaps between the sidebar logo/title and top-bar title (see screenshot). Consider hiding sidebar brand text or reducing width."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Verify data-testid naming for the avg-progress KPI card (spec says kpi-avg-progress-pct).",
+    "Fix visual overlap between sidebar brand and top-bar app title on desktop."
+  ],
+  "critical_code_review_comments": [
+    "audit() previously stored raw dicts returned from insert_one (which motor mutates to include _id ObjectId) leading to unreadable audit logs. Now sanitized.",
+    "PENDING dict for bulk upload is in-memory only — will lose validation state on backend restart; consider persisting to a short-TTL collection for robustness.",
+    "core.py's audit() stores full user objects in reports/dashboards but that is okay; only nested _id was the issue.",
+    "server.py uses allow_origin_regex='.*' with credentials — works but permissive; consider tightening in production."
+  ],
+  "updated_files": ["/app/backend/core.py", "/app/backend/masters.py", "/app/backend/tests/backend_test.py"],
+  "success_rate": {"backend": "100% (43/43)", "frontend": "smoke pass"},
+  "test_credentials": "admin@dep.org/admin123, management@dep.org/manage123, coordinator@dep.org/coord123, teacher@dep.org/teach123, student@dep.org/stud123",
+  "seed_data_creation": "Tests create TEST_* prefixed students/users/blocks; upload_history rows also created (safe).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend pytest at /app/backend/tests/backend_test.py runs from repo root: `python -m pytest backend/tests/backend_test.py`. All 43 tests currently pass. Frontend only smoke-tested; deeper interactive testing (form dialogs, chart rendering, promotion UI, bulk upload UI end-to-end) not yet exercised. Audit-log 500 bug was fixed by adding _strip_mongo_ids helper in core.py.",
+  "rca of the issue": "GET /api/audit-logs returned 500. RCA: audit() persisted new_value/old_value dicts returned from motor insert_one, which mutates the passed dict to contain an ObjectId _id. When the audit-logs endpoint tried to serialize these nested _id ObjectIds, FastAPI's jsonable_encoder failed. Mitigation: added _strip_mongo_ids helper in core.py that recursively drops _id keys from dicts/lists; audit() now sanitizes old_value/new_value on write, and audit-logs endpoint also sanitizes on read for backward compatibility with existing records."
+}

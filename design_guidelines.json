@@ -1,0 +1,202 @@
+{
+  "project_name": "DIGITAL EDUCATION PROGRAM — Student Attendance & Learning Management System",
+  "archetype": "ORGANIC & CSR PRECISION (Trust, Growth, CSR Social Impact & High Data Density)",
+  "theme_mode": "light_with_dark_sidebar_option",
+  "typography": {
+    "google_fonts_import": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap",
+    "heading_font": "'Outfit', 'Plus Jakarta Sans', sans-serif",
+    "body_font": "'Plus Jakarta Sans', system-ui, sans-serif",
+    "mono_font": "'JetBrains Mono', monospace",
+    "scale": {
+      "hero_title": "text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-tight",
+      "h1": "text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-slate-900",
+      "h2": "text-xl sm:text-2xl font-semibold tracking-tight text-slate-800",
+      "h3": "text-lg sm:text-xl font-medium text-slate-800",
+      "kpi_value": "text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight",
+      "body_lead": "text-base sm:text-lg text-slate-600 leading-relaxed",
+      "body": "text-sm sm:text-base text-slate-700 leading-normal",
+      "caption": "text-xs text-slate-500 font-medium tracking-wide uppercase"
+    }
+  },
+  "colors": {
+    "hsl_variables": {
+      "--background": "210 20% 98%",
+      "--foreground": "222 47% 11%",
+      "--card": "0 0% 100%",
+      "--card-foreground": "222 47% 11%",
+      "--popover": "0 0% 100%",
+      "--popover-foreground": "222 47% 11%",
+      "--primary": "166 72% 28%",
+      "--primary-foreground": "166 100% 97%",
+      "--secondary": "215 25% 95%",
+      "--secondary-foreground": "222 47% 11%",
+      "--muted": "210 20% 94%",
+      "--muted-foreground": "215 16% 47%",
+      "--accent": "38 92% 50%",
+      "--accent-foreground": "38 100% 98%",
+      "--destructive": "0 84% 60%",
+      "--destructive-foreground": "210 40% 98%",
+      "--border": "214 32% 91%",
+      "--input": "214 32% 91%",
+      "--ring": "166 72% 28%",
+      "--radius": "0.5rem"
+    },
+    "brand_palette": {
+      "primary_emerald": "#065F46",
+      "primary_teal": "#0D9488",
+      "accent_amber": "#D97706",
+      "accent_indigo": "#4F46E5",
+      "accent_sky": "#0284C7",
+      "neutral_dark": "#0F172A",
+      "neutral_card": "#FFFFFF",
+      "neutral_bg": "#F8FAFC",
+      "border_subtle": "#E2E8F0"
+    },
+    "chart_colors": [
+      "#065F46",
+      "#0D9488",
+      "#D97706",
+      "#4F46E5",
+      "#0284C7",
+      "#E11D48",
+      "#8B5CF6",
+      "#059669",
+      "#14B8A6",
+      "#F59E0B",
+      "#6366F1",
+      "#38BDF8",
+      "#F43F5E",
+      "#A855F7"
+    ]
+  },
+  "layout_and_structure": {
+    "sidebar": {
+      "desktop": "fixed left-0 top-0 bottom-0 w-64 bg-slate-900 text-slate-100 flex flex-col z-40 border-r border-slate-800",
+      "brand_header": "h-16 px-6 flex items-center gap-3 border-b border-slate-800 bg-slate-950/50",
+      "academic_year_switcher": "mx-4 my-3 p-3 bg-slate-800/70 rounded-lg border border-slate-700 text-xs text-slate-200",
+      "navigation": "px-3 py-2 space-y-1 overflow-y-auto flex-1",
+      "nav_item_active": "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-semibold bg-emerald-600 text-white shadow-sm transition-all",
+      "nav_item_inactive": "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 transition-colors"
+    },
+    "header": {
+      "container": "h-16 sticky top-0 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 flex items-center justify-between z-30 shadow-xs",
+      "academic_year_pill": "px-3 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200/70 rounded-full text-xs font-semibold flex items-center gap-2",
+      "role_badge": "px-2.5 py-1 bg-slate-100 text-slate-800 border border-slate-200 rounded-md text-xs font-bold uppercase tracking-wider"
+    },
+    "mobile_bottom_nav": {
+      "container": "fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-slate-200 flex items-center justify-around px-2 z-50 md:hidden shadow-lg",
+      "nav_item": "flex flex-col items-center justify-center text-[10px] font-medium py-1 text-slate-500 hover:text-emerald-700 transition-colors"
+    },
+    "main_content": "md:pl-64 pt-0 min-h-screen bg-slate-50 pb-20 md:pb-8"
+  },
+  "key_components": {
+    "kpi_cards": {
+      "container_grid": "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 mb-8",
+      "card_style": "p-5 bg-white rounded-xl border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow relative overflow-hidden group",
+      "top_accent_line": "absolute top-0 left-0 right-0 h-1 bg-emerald-600 group-hover:bg-emerald-500 transition-colors",
+      "icon_wrapper": "p-2.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center justify-center shrink-0"
+    },
+    "chart_containers": {
+      "grid_layout": "grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8",
+      "card_wrapper": "bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between",
+      "header": "flex items-center justify-between pb-3 mb-4 border-b border-slate-100"
+    },
+    "data_tables": {
+      "wrapper": "bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden",
+      "toolbar": "p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50",
+      "table": "w-full text-sm text-left border-collapse",
+      "th": "bg-slate-100/70 text-slate-700 font-bold px-4 py-3 border-b border-slate-200 text-xs uppercase tracking-wider",
+      "td": "px-4 py-3 border-b border-slate-100 text-slate-700 font-medium whitespace-nowrap",
+      "row_hover": "hover:bg-slate-50/80 transition-colors"
+    },
+    "attendance_grid": {
+      "cell_present": "bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200 cursor-pointer font-bold transition-all text-xs px-2 py-1 rounded",
+      "cell_absent": "bg-rose-100 text-rose-800 border-rose-300 hover:bg-rose-200 cursor-pointer font-bold transition-all text-xs px-2 py-1 rounded",
+      "cell_late": "bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200 cursor-pointer font-bold transition-all text-xs px-2 py-1 rounded"
+    },
+    "bulk_upload_wizard": {
+      "step_indicator": "flex items-center justify-center gap-2 sm:gap-4 my-6",
+      "dropzone": "border-2 border-dashed border-slate-300 hover:border-emerald-500 bg-slate-50/70 hover:bg-emerald-50/30 rounded-xl p-8 text-center transition-all cursor-pointer"
+    }
+  },
+  "roles": [
+    {
+      "role": "Admin",
+      "description": "Full system configuration, bulk operations, user permissions & global settings",
+      "badge_color": "bg-purple-100 text-purple-800 border-purple-200"
+    },
+    {
+      "role": "Management",
+      "description": "CSR impact metrics, state/district aggregate views, overall program analytics",
+      "badge_color": "bg-blue-100 text-blue-800 border-blue-200"
+    },
+    {
+      "role": "Coordinator",
+      "description": "Block & school supervisor, teacher attendance verification, course distribution",
+      "badge_color": "bg-emerald-100 text-emerald-800 border-emerald-200"
+    },
+    {
+      "role": "Teacher",
+      "description": "Daily student attendance marking, course progress reporting, village student master",
+      "badge_color": "bg-amber-100 text-amber-800 border-amber-200"
+    },
+    {
+      "role": "Student",
+      "description": "Personal attendance record, course progress roadmap, certificates & badges",
+      "badge_color": "bg-teal-100 text-teal-800 border-teal-200"
+    }
+  ],
+  "image_assets": {
+    "login_hero": "https://images.pexels.com/photos/1895114/pexels-photo-1895114.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+    "students_rural_classroom": "https://images.pexels.com/photos/35558791/pexels-photo-35558791.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+    "csr_banner": "https://images.unsplash.com/photo-1641683521844-700c456379bd?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTJ8MHwxfHNlYXJjaHwzfHxpbmRpYW4lMjBydXJhbCUyMGVkdWNhdGlvbiUyMHN0dWRlbnRzJTIwY2xhc3Nyb29tfGVufDB8fHx8MTc4NzEyNTM3OHww&ixlib=rb-4.1.0&q=85",
+    "teacher_desk": "https://images.unsplash.com/photo-1650810626726-e63d4ad3bc8f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTJ8MHwxfHNlYXJjaHw0fHxpbmRpYW4lMjBydXJhbCUyMGVkdWNhdGlvbiUyMHN0dWRlbnRzJTIwY2xhc3Nyb29tfGVufDB8fHx8MTc4NzEyNTM3OHww&ixlib=rb-4.1.0&q=85",
+    "student_boy": "https://images.unsplash.com/flagged/photo-1574098335395-18cf525e45d6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTJ8MHwxfHNlYXJjaHwyfHxpbmRpYW4lMjBydXJhbCUyMGVkdWNhdGlvbiUyMHN0dWRlbnRzJTIwY2xhc3Nyb29tfGVufDB8fHx8MTc4NzEyNTM3OHww&ixlib=rb-4.1.0&q=85"
+  },
+  "testing_and_accessibility": {
+    "data_testid_convention": "kebab-case, role-based, explicit",
+    "required_data_testids": [
+      "login-email-input",
+      "login-password-input",
+      "login-role-selector",
+      "login-submit-button",
+      "global-academic-year-select",
+      "sidebar-nav-dashboard",
+      "sidebar-nav-students",
+      "sidebar-nav-attendance",
+      "sidebar-nav-courses",
+      "sidebar-nav-reports",
+      "sidebar-nav-academic-years",
+      "sidebar-nav-bulk-upload",
+      "kpi-total-students-value",
+      "kpi-average-attendance-value",
+      "kpi-active-schools-value",
+      "student-search-input",
+      "student-block-filter",
+      "student-school-filter",
+      "student-export-excel-button",
+      "attendance-date-picker",
+      "attendance-mark-all-present-button",
+      "attendance-save-button",
+      "bulk-upload-dropzone",
+      "bulk-upload-preview-table",
+      "bulk-upload-confirm-button",
+      "reports-export-pdf-button",
+      "reports-export-excel-button",
+      "mobile-nav-dashboard",
+      "mobile-nav-attendance",
+      "mobile-nav-students",
+      "user-profile-menu-button"
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Ensure standard Tailwind utility styles and Shadcn primitive components are used for forms, dialogs, dropdowns, and buttons.",
+    "The header must include the global Academic Year dropdown, active role badge, search bar, and user profile drawer.",
+    "Management Dashboard MUST feature 13 distinct KPI cards and 14 clear interactive charts (Recharts) covering attendance rates, block wise performance, course completion, village breakdown, gender distribution, and year-over-year trends.",
+    "Student Master view should support filtering by Block, Village, School, Grade, and Gender, with instant search and CSV/Excel export triggers.",
+    "Daily Attendance Marking view should support quick toggle per student, batch present/absent buttons, and sticky date header.",
+    "Bulk Excel Upload must provide a clear 4-step wizard: 1. Download Template, 2. Drag & Drop File, 3. Review Validation & Error Summary, 4. Confirm Import.",
+    "Provide bottom navigation on mobile devices with key routes (Dashboard, Attendance, Students, Courses, Reports).",
+    "Ensure sonner toasts confirm actions like Attendance Submitted, Student Added, Excel Exported, and Year Switch."
+  ]
+}
