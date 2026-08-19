@@ -117,6 +117,115 @@ class ProgressIn(BaseModel):
     completed_lessons: int
 
 
+class LessonToggleIn(BaseModel):
+    completed: bool
+
+
+async def ensure_curriculum(course: dict):
+    """Create default modules and lessons for a course the first time they are needed."""
+    mods = await db.course_modules.find({"course_id": course["id"]}, {"_id": 0}).sort("order", 1).to_list(200)
+    if mods:
+        return mods
+    total_lessons = max(int(course.get("total_lessons") or 1), 1)
+    total_modules = max(min(int(course.get("total_modules") or 1), total_lessons), 1)
+    per_module = -(-total_lessons // total_modules)
+    created, n = [], 0
+    for mi in range(total_modules):
+        mod = {"id": new_id(), "course_id": course["id"], "name": f"Module {mi + 1}",
+               "order": mi + 1, "created_at": now_iso()}
+        await db.course_modules.insert_one(dict(mod))
+        lessons = []
+        for _ in range(per_module):
+            if n >= total_lessons:
+                break
+            n += 1
+            lessons.append({"id": new_id(), "course_id": course["id"], "module_id": mod["id"],
+                            "name": f"Lesson {n}", "order": n, "created_at": now_iso()})
+        if lessons:
+            await db.course_lessons.insert_many([dict(l) for l in lessons])
+        created.append(mod)
+    return created
+
+
+@router.get("/courses/{course_id}/curriculum")
+async def get_curriculum(course_id: str, user: dict = Depends(get_current_user)):
+    course = await db.courses.find_one({"id": course_id}, {"_id": 0})
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    mods = await ensure_curriculum(course)
+    lessons = await db.course_lessons.find({"course_id": course_id}, {"_id": 0}).sort("order", 1).to_list(2000)
+    by_mod = {}
+    for l in lessons:
+        by_mod.setdefault(l["module_id"], []).append(l)
+    return {"course": course, "modules": [{**m, "lessons": by_mod.get(m["id"], [])} for m in mods]}
+
+
+@router.get("/course-progress/{record_id}/lessons")
+async def progress_lessons(record_id: str, user: dict = Depends(get_current_user)):
+    rec = await db.student_courses.find_one({"id": record_id}, {"_id": 0})
+    if not rec:
+        raise HTTPException(status_code=404, detail="Progress record not found")
+    if user.get("role") == "student" and user.get("student_code") != rec["student_id"]:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    course = await db.courses.find_one({"id": rec["course_id"]}, {"_id": 0}) or {}
+    mods = await ensure_curriculum(course)
+    lessons = await db.course_lessons.find({"course_id": rec["course_id"]}, {"_id": 0}).sort("order", 1).to_list(2000)
+    ticks = {t["lesson_id"]: t for t in await db.student_lessons.find(
+        {"student_id": rec["student_id"], "course_id": rec["course_id"],
+         "academic_year_id": rec["academic_year_id"]}, {"_id": 0}).to_list(2000)}
+    by_mod = {}
+    for l in lessons:
+        by_mod.setdefault(l["module_id"], []).append(
+            {**l, "completed": l["id"] in ticks, "completed_at": ticks.get(l["id"], {}).get("completed_at", "")})
+    student = await db.students.find_one({"student_id": rec["student_id"]}, {"_id": 0}) or {}
+    total = len(lessons) or 1
+    done = sum(1 for l in lessons if l["id"] in ticks)
+    return {"record": rec, "student_name": student.get("name", ""), "course_name": course.get("name", ""),
+            "total_lessons": len(lessons), "completed_lessons": done,
+            "progress_pct": round(done / total * 100, 1),
+            "modules": [{**m, "lessons": by_mod.get(m["id"], []),
+                         "completed": sum(1 for l in by_mod.get(m["id"], []) if l["completed"])} for m in mods]}
+
+
+async def recount_progress(rec: dict, user: dict):
+    lessons = await db.course_lessons.find({"course_id": rec["course_id"]}, {"_id": 0}).to_list(2000)
+    total = len(lessons) or (rec.get("total_lessons") or 1)
+    done = await db.student_lessons.count_documents(
+        {"student_id": rec["student_id"], "course_id": rec["course_id"],
+         "academic_year_id": rec["academic_year_id"]})
+    status = progress_status(done, total)
+    upd = {"completed_lessons": done, "total_lessons": total, "status": status,
+           "last_activity": now_iso()[:10],
+           "completion_date": now_iso()[:10] if status == "completed" else ""}
+    if not rec.get("start_date") and done > 0:
+        upd["start_date"] = now_iso()[:10]
+    await db.student_courses.update_one({"id": rec["id"]}, {"$set": upd})
+    return {**rec, **upd, "progress_pct": round(done / total * 100, 1)}
+
+
+@router.post("/course-progress/{record_id}/lessons/{lesson_id}")
+async def toggle_lesson(record_id: str, lesson_id: str, payload: LessonToggleIn,
+                        user: dict = Depends(require_roles("admin", "coordinator", "teacher"))):
+    rec = await db.student_courses.find_one({"id": record_id}, {"_id": 0})
+    if not rec:
+        raise HTTPException(status_code=404, detail="Progress record not found")
+    lesson = await db.course_lessons.find_one({"id": lesson_id, "course_id": rec["course_id"]}, {"_id": 0})
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Lesson not found for this course")
+    key = {"student_id": rec["student_id"], "course_id": rec["course_id"],
+           "academic_year_id": rec["academic_year_id"], "lesson_id": lesson_id}
+    if payload.completed:
+        await db.student_lessons.update_one(key, {"$set": {**key, "completed_at": now_iso(),
+                                                          "marked_by": user.get("name")}}, upsert=True)
+    else:
+        await db.student_lessons.delete_one(key)
+    out = await recount_progress(rec, user)
+    await audit(user, "toggle_lesson", "course_progress", record_id, None,
+                {"lesson": lesson["name"], "completed": payload.completed,
+                 "completed_lessons": out["completed_lessons"]})
+    return out
+
+
 def progress_status(completed: int, total: int) -> str:
     if completed <= 0:
         return "not_started"

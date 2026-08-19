@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { CHART_COLORS } from "@/lib/api";
 import {
   ResponsiveContainer, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
-  XAxis, YAxis, Tooltip, CartesianGrid, Legend,
+  XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
 import { Loader2, Inbox } from "lucide-react";
 
@@ -83,17 +84,22 @@ export const Badge = ({ children, tone = "slate" }) => (
 
 export function Chart({ type = "bar", data = [], title, subtitle, onClick, dataKey = "value", height = 260, testid }) {
   const rows = (data || []).filter((d) => d && d.name !== undefined).slice(0, 14);
+  const [hovered, setHovered] = useState(null);
   return (
     <Panel title={title} subtitle={subtitle} testid={testid}>
       {rows.length === 0 ? <Empty text="No chart data" /> : (
+        <div onClick={() => type === "pie" && onClick && hovered && onClick(hovered)}
+          style={{ cursor: type === "pie" && onClick && hovered ? "pointer" : "default" }}>
         <ResponsiveContainer width="100%" height={height}>
           {type === "pie" ? (
             <PieChart>
               <Pie data={rows} dataKey={dataKey} nameKey="name" innerRadius={55} outerRadius={90}
-                onClick={(e) => onClick && onClick(e?.name)}>
-                {rows.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                cursor={onClick ? "pointer" : "default"}
+                onMouseEnter={(_, idx) => setHovered(rows[idx]?.name)}
+                onMouseLeave={() => setHovered(null)}>
+                {rows.map((r, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
               </Pie>
-              <Tooltip /><Legend />
+              <Tooltip />
             </PieChart>
           ) : type === "line" ? (
             <LineChart data={rows}>
@@ -112,6 +118,23 @@ export function Chart({ type = "bar", data = [], title, subtitle, onClick, dataK
             </BarChart>
           )}
         </ResponsiveContainer>
+        {type === "pie" && (
+          <div className="flex flex-wrap gap-2 mt-3 justify-center">
+            {rows.map((r, i) => (
+              <button key={r.name} type="button" disabled={!onClick}
+                data-testid={`slice-${String(r.name).toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                onClick={(e) => { e.stopPropagation(); onClick && onClick(r.name); }}
+                className={`flex items-center gap-2 px-2.5 py-1 rounded-full border text-xs font-semibold transition-colors ${
+                  onClick ? "border-slate-200 text-slate-700 hover:border-emerald-400 hover:bg-emerald-50 cursor-pointer"
+                    : "border-slate-200 text-slate-600 cursor-default"}`}>
+                <span className="h-2.5 w-2.5 rounded-full" style={{ background: CHART_COLORS[i % CHART_COLORS.length] }} />
+                {r.name}
+                <span className="font-mono text-slate-500">{r[dataKey]}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        </div>
       )}
     </Panel>
   );

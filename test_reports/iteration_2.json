@@ -1,0 +1,42 @@
+{
+  "summary": "Focused testing of the two new features (chart drilldown + lesson tracking) plus full regression. Wrote 21 new pytest cases in /app/backend/tests/test_new_features.py — all 21 pass, and all 43 previously-passing tests in backend_test.py continue to pass (64/64 backend, 100%). Frontend smoke: admin login works, bar-chart drilldowns (block/school/class/CP course) all open drilldown-dialog with correct counts (e.g. Std 6 -> 70 rows matches overview chart value), drilldown row click navigates to /students/<code>. Lesson tracker dialog opens from open-lessons-<id>, ticking Lesson 1 correctly moves count from '0 / 15 lessons' to '1 / 15 lessons' and updates via re-fetch; module-complete-<order> and module-clear-<order> bulk buttons render. Backend confirmed: curriculum lazy-generation + idempotency, unique-index dedup on re-tick (no double count), toggle_lesson audit entry created, RBAC (teacher/coordinator CAN, management 403, student 403 on toggle but 200 on own GET, 403 on other GET).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Chart (pie type) in /app/frontend/src/components/Ui.jsx", "issue": "Pie-chart drill-downs do NOT open the drilldown dialog when a slice is clicked. Affects chart-gender-students, chart-present-absent, chart-course-completion. Neither the Pie onClick nor a Cell onClick handler fires — click lands on the outer Panel (focus ring appears) but no click event reaches the SVG sectors. Bar chart drilldowns work fine. Backend GET /api/dashboard/drilldown for pie charts (gender/present_vs_absent/course_completion) works correctly (verified in tests). Likely a Recharts 3.6.0 event-handling regression: sectors may need onMouseDown or wrapping the ResponsiveContainer with an onClick that reads activePayload via a controlled state.", "selector": "[data-testid=\"chart-gender-students\"] path.recharts-sector", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Drilldown dialog title", "issues": ["Title renders as e.g. 'Students in class — Std 670 student records' — the count span sits immediately after label without a separator. Consider adding a bullet/dot or line-break between label and count for readability."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_new_features.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_new_features.xml",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Fix pie-chart drilldown click handling in /app/frontend/src/components/Ui.jsx (Recharts 3.6). Options: (a) put a transparent onClick on the wrapping div and read activePayload from PieChart state, or (b) upgrade/downgrade recharts, or (c) use <Sector activeShape> with an explicit onClick, or (d) bind onMouseDown instead of onClick on <Cell>. Verify all three pies (chart-gender-students, chart-present-absent, chart-course-completion) then rerun the frontend smoke."
+  ],
+  "critical_code_review_comments": [
+    "dashboards.py drilldown: chart='present_vs_absent' logic uses `per_att[sid].get(label.lower(), 0) > 0` which returns EVERY student who has at least one Present record when clicking 'Present' — that is correct only if the ask was 'students with at least one present day'. If the intended semantic was 'aggregate present record count of that many rows', it should return student-day rows, not student rows. Please confirm the product intent.",
+    "courses.ensure_curriculum() computes per_module via ceil-division which distributes lessons unevenly (last module can be short). Acceptable but worth documenting.",
+    "PUT /api/course-progress/{id} numeric endpoint still exists (unused by UI). Consider deprecating with a 410 or leaving a docstring note.",
+    "Ui.jsx Chart component: cursor:pointer on bars is not set; users don't get a hover cue that bars are clickable (title-bar 'Click a bar to see the students' compensates but a css cursor would help)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_new_features.py",
+    "/app/frontend/src/components/Ui.jsx"
+  ],
+  "success_rate": {"backend": "100% (64/64 = 43 regression + 21 new)", "frontend": "bar drilldowns + lesson tracker PASS; pie drilldowns FAIL"},
+  "test_credentials": "admin@dep.org/admin123, management@dep.org/manage123, coordinator@dep.org/coord123, teacher@dep.org/teach123, student@dep.org/stud123 (code 1001)",
+  "seed_data_creation": "None new — tests reuse seeded data for years 2025-26 and 2026-27.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All backend new-feature tests are in /app/backend/tests/test_new_features.py. Frontend blocker is limited to pie-chart drilldowns — bar drilldowns and lesson tracker are fully working. After fixing Ui.jsx pie onClick handling, re-run the Playwright pie-drilldown block for chart-gender-students, chart-present-absent, and chart-course-completion; confirm '[data-testid=drilldown-dialog]' appears within 3s of clicking `path.recharts-sector`. I added a `style={{cursor:'pointer'}}` and a Cell-level onClick as a first attempt but Recharts 3.6 still swallows the click.",
+  "rca of the issue": "Pie-chart drilldown click regression. RCA: Recharts 3.6.0's <Pie> renders sectors as <path class='recharts-sector'> children of an internal <g> that intercepts pointer events but does not fire the onClick prop passed to <Pie>. Also, <Cell> onClick is not forwarded in v3. Reproduction: on / (Overall Dashboard) click any slice of 'Student Count by Gender' — no dialog opens, no console error, but the enclosing Panel gains its keyboard focus ring (click delivered to wrapper only). Mitigation: wire onClick at the PieChart level via `onClick={({activePayload}) => onClick && onClick(activePayload?.[0]?.name)}` (same trick as BarChart uses with activeLabel), or bind the handler directly to each Sector via the `activeShape`/`shape` prop that Recharts explicitly supports."
+}

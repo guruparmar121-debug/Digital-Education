@@ -140,6 +140,88 @@ def _group(items, keyfn):
     return d
 
 
+@router.get("/dashboard/drilldown")
+async def drilldown(chart: str, label: str, academic_year_id: str, block_id: str = "",
+                    village_id: str = "", school_id: str = "", standard: str = "", gender: str = "",
+                    course_id: str = "", date_from: str = "", date_to: str = "",
+                    user: dict = Depends(get_current_user)):
+    """Return the exact student records behind a clicked chart point."""
+    say, students, att, prog = await gather(academic_year_id, block_id, village_id, school_id,
+                                            standard, gender, course_id, date_from, date_to)
+    schools = {s["id"]: s["name"] for s in await db.schools.find({}, {"_id": 0}).to_list(5000)}
+    blocks = {b["id"]: b["name"] for b in await db.blocks.find({}, {"_id": 0}).to_list(5000)}
+    courses = {c["id"]: c for c in await db.courses.find({}, {"_id": 0}).to_list(5000)}
+    enroll = {r["student_id"]: r for r in say}
+
+    per_att = defaultdict(lambda: {"present": 0, "absent": 0})
+    month_att = defaultdict(lambda: defaultdict(lambda: {"present": 0, "absent": 0}))
+    for a in att:
+        per_att[a["student_id"]][a["status"]] += 1
+        month_att[a["date"][:7]][a["student_id"]][a["status"]] += 1
+    per_prog = defaultdict(list)
+    for p in prog:
+        per_prog[p["student_id"]].append(p)
+
+    std_label = label.replace("Std ", "").strip()
+    keep = []
+    for sid, e in enroll.items():
+        s = students.get(sid, {})
+        if not s:
+            continue
+        rows_prog = per_prog.get(sid, [])
+        match = False
+        if chart in ("block_students",):
+            match = blocks.get(e.get("block_id"), "") == label
+        elif chart in ("school_students", "school_attendance", "school_progress"):
+            match = schools.get(e.get("school_id"), "") == label
+        elif chart in ("class_students", "class_attendance", "class_progress"):
+            match = str(e.get("standard", "")) == std_label
+        elif chart == "gender_students":
+            match = s.get("gender", "") == label
+        elif chart == "monthly_attendance":
+            match = sid in month_att.get(label, {})
+        elif chart == "present_vs_absent":
+            key = label.lower()
+            match = per_att[sid].get(key, 0) > 0
+        elif chart == "monthly_progress":
+            match = any((p.get("last_activity") or "")[:7] == label for p in rows_prog)
+        elif chart in ("course_progress",):
+            match = any(courses.get(p["course_id"], {}).get("name") == label for p in rows_prog)
+        elif chart == "course_completion":
+            wanted = label.lower().replace(" ", "_")
+            match = any(p.get("status") == wanted for p in rows_prog)
+        elif chart in ("top_students", "low_students"):
+            match = s.get("name") == label
+        if not match:
+            continue
+        total = per_att[sid]["present"] + per_att[sid]["absent"]
+        if chart == "monthly_attendance":
+            m = month_att[label][sid]
+            present, absent = m["present"], m["absent"]
+            total = present + absent
+        else:
+            present, absent = per_att[sid]["present"], per_att[sid]["absent"]
+        rel = rows_prog
+        if chart == "course_progress":
+            rel = [p for p in rows_prog if courses.get(p["course_id"], {}).get("name") == label]
+        elif chart == "course_completion":
+            rel = [p for p in rows_prog if p.get("status") == label.lower().replace(" ", "_")]
+        keep.append({
+            "student_id": sid, "name": s.get("name", ""), "gender": s.get("gender", ""),
+            "standard": e.get("standard", ""), "division": e.get("division", ""),
+            "school_name": schools.get(e.get("school_id"), ""),
+            "block_name": blocks.get(e.get("block_id"), ""),
+            "parent_mobile": s.get("parent_mobile", ""),
+            "working_days": total, "present": present, "absent": absent,
+            "attendance_pct": pct(present, total),
+            "courses": len(rel),
+            "avg_progress_pct": round(sum(pct(p.get("completed_lessons", 0), p.get("total_lessons") or 1)
+                                          for p in rel) / len(rel), 1) if rel else 0,
+        })
+    keep.sort(key=lambda r: r["name"])
+    return {"chart": chart, "label": label, "count": len(keep), "rows": keep}
+
+
 @router.get("/dashboard/course-progress")
 async def progress_dashboard(academic_year_id: str, block_id: str = "", school_id: str = "",
                              standard: str = "", course_id: str = "", user: dict = Depends(get_current_user)):

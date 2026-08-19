@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { useDrilldown } from "@/components/Drilldown";
+import LessonTracker from "@/components/LessonTracker";
 import { Plus, BookOpen, Users, TrendingUp, Award, CheckCircle2, Clock, CircleOff } from "lucide-react";
 
 const blankCourse = { course_code: "", name: "", subject: "", description: "", standard: "", school_id: "", total_modules: 3, total_lessons: 12, duration: "", start_date: "", end_date: "", status: "active" };
@@ -149,6 +151,8 @@ export function CourseProgress() {
   const [loading, setLoading] = useState(true);
   const [threshold, setThreshold] = useState(50);
   const [lowOnly, setLowOnly] = useState(false);
+  const [lessonRecord, setLessonRecord] = useState(null);
+  const { open: drill, dialog: drillDialog } = useDrilldown(yearId, applied);
 
   useEffect(() => { if (yearId) api.get("/courses", { params: { academic_year_id: yearId } }).then((r) => setCourses(r.data)).catch(() => {}); }, [yearId]);
 
@@ -162,14 +166,6 @@ export function CourseProgress() {
       .then((r) => setDash(r.data)).catch(() => {});
   }, [yearId, applied, lowOnly, threshold]);
   useEffect(() => { load(); }, [load]);
-
-  const update = async (r, val) => {
-    try {
-      await api.put(`/course-progress/${r.id}`, { completed_lessons: Number(val) });
-      toast.success("Progress updated");
-      load();
-    } catch (e) { toast.error(errMsg(e.response?.data?.detail)); }
-  };
 
   const k = dash?.kpis || {}; const c = dash?.charts || {};
   return (
@@ -187,12 +183,12 @@ export function CourseProgress() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5 mb-8">
-        <Chart testid="cp-chart-course" title="Course-wise Progress %" data={c.course_progress} />
-        <Chart testid="cp-chart-school" title="School-wise Progress %" data={c.school_progress} />
-        <Chart testid="cp-chart-class" title="Class-wise Progress %" data={c.class_progress} />
+        <Chart testid="cp-chart-course" title="Course-wise Progress %" data={c.course_progress} onClick={drill("course_progress", "Course")} subtitle="Click a bar to see the students" />
+        <Chart testid="cp-chart-school" title="School-wise Progress %" data={c.school_progress} onClick={drill("school_progress", "Progress in school")} subtitle="Click a bar to see the students" />
+        <Chart testid="cp-chart-class" title="Class-wise Progress %" data={c.class_progress} onClick={drill("class_progress", "Progress in class")} subtitle="Click a bar to see the students" />
         <Chart testid="cp-chart-monthly" title="Monthly Progress %" type="line" data={c.monthly_progress} />
-        <Chart testid="cp-chart-completion" title="Course Completion" type="pie" data={c.course_completion} />
-        <Chart testid="cp-chart-top" title="Top Students" data={c.top_students} />
+        <Chart testid="cp-chart-completion" title="Course Completion" type="pie" data={c.course_completion} onClick={drill("course_completion", "Courses")} />
+        <Chart testid="cp-chart-top" title="Top Students" data={c.top_students} onClick={drill("top_students", "Student")} subtitle="Click a bar to see the student" />
       </div>
 
       <Filters value={filters} onChange={setFilters} onApply={() => setApplied(filters)} courses={courses}
@@ -218,14 +214,19 @@ export function CourseProgress() {
           { key: "progress_pct", label: "Progress", render: (r) => <Progress value={r.progress_pct} /> },
           { key: "status", label: "Status", render: (r) => <Badge tone={r.status === "completed" ? "emerald" : r.status === "in_progress" ? "amber" : "slate"}>{r.status.replace("_", " ")}</Badge> },
           { key: "last_activity", label: "Last Activity" },
-          ...(canEdit ? [{
-            key: "actions", label: "Update Lessons", render: (r) => (
-              <Input data-testid={`progress-input-${r.id}`} type="number" defaultValue={r.completed_lessons}
-                className="h-8 w-20" onBlur={(e) => e.target.value !== String(r.completed_lessons) && update(r, e.target.value)} />
+          {
+            key: "lessons", label: "Lessons", render: (r) => (
+              <Button size="sm" variant="outline" data-testid={`open-lessons-${r.id}`}
+                onClick={() => setLessonRecord(r.id)}>
+                {canEdit ? "Tick lessons" : "View lessons"}
+              </Button>
             ),
-          }] : []),
+          },
         ]} />}
       </Panel>
+      {drillDialog}
+      <LessonTracker recordId={lessonRecord} canEdit={canEdit}
+        onClose={() => setLessonRecord(null)} onSaved={load} />
     </div>
   );
 }

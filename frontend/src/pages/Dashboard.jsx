@@ -4,6 +4,7 @@ import { useYear } from "@/context/YearContext";
 import { useAuth } from "@/context/AuthContext";
 import { Kpi, Chart, PageTitle, Panel, Spinner, Table, Progress } from "@/components/Ui";
 import Filters from "@/components/Filters";
+import { useDrilldown } from "@/components/Drilldown";
 import {
   Users, School, MapPin, Home, UserCog, BookOpen, CheckCircle2, XCircle, Percent,
   TrendingUp, Award, AlertTriangle, AlertCircle,
@@ -18,6 +19,7 @@ export default function Dashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [low, setLow] = useState([]);
+  const { open: drill, dialog: drillDialog } = useDrilldown(yearId, applied);
 
   useEffect(() => {
     if (!yearId) return;
@@ -33,7 +35,6 @@ export default function Dashboard() {
   const k = data?.kpis || {};
   const c = data?.charts || {};
   const title = user?.role === "management" ? "Management Dashboard" : "Overall Dashboard";
-
   return (
     <div>
       <PageTitle title={title} subtitle={`Academic Year ${year?.year || ""} — consolidated programme performance`} />
@@ -57,18 +58,18 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5 mb-8">
-        <Chart testid="chart-block-students" title="Block-wise Students" data={c.block_students} />
-        <Chart testid="chart-school-students" title="School-wise Students" data={c.school_students} />
-        <Chart testid="chart-class-students" title="Class-wise Students" data={c.class_students} />
-        <Chart testid="chart-gender-students" title="Student Count by Gender" type="pie" data={c.gender_students} />
+        <Chart testid="chart-block-students" title="Block-wise Students" data={c.block_students} onClick={drill("block_students", "Students in block")} subtitle="Click a bar to see the students" />
+        <Chart testid="chart-school-students" title="School-wise Students" data={c.school_students} onClick={drill("school_students", "Students in school")} subtitle="Click a bar to see the students" />
+        <Chart testid="chart-class-students" title="Class-wise Students" data={c.class_students} onClick={drill("class_students", "Students in class")} subtitle="Click a bar to see the students" />
+        <Chart testid="chart-gender-students" title="Student Count by Gender" type="pie" data={c.gender_students} onClick={drill("gender_students", "Students")} />
         <Chart testid="chart-monthly-attendance" title="Monthly Attendance Trend" type="line" data={c.monthly_attendance} subtitle="Attendance %" />
-        <Chart testid="chart-school-attendance" title="School-wise Attendance %" data={c.school_attendance} />
-        <Chart testid="chart-class-attendance" title="Class-wise Attendance %" data={c.class_attendance} />
-        <Chart testid="chart-present-absent" title="Present vs Absent" type="pie" data={c.present_vs_absent} />
-        <Chart testid="chart-course-progress" title="Course-wise Progress %" data={c.course_progress} />
-        <Chart testid="chart-school-progress" title="School-wise Course Progress %" data={c.school_progress} />
+        <Chart testid="chart-school-attendance" title="School-wise Attendance %" data={c.school_attendance} onClick={drill("school_attendance", "Attendance in school")} subtitle="Click a bar to see the students" />
+        <Chart testid="chart-class-attendance" title="Class-wise Attendance %" data={c.class_attendance} onClick={drill("class_attendance", "Attendance in class")} subtitle="Click a bar to see the students" />
+        <Chart testid="chart-present-absent" title="Present vs Absent" type="pie" data={c.present_vs_absent} onClick={drill("present_vs_absent", "Attendance records")} />
+        <Chart testid="chart-course-progress" title="Course-wise Progress %" data={c.course_progress} onClick={drill("course_progress", "Course")} subtitle="Click a bar to see the students" />
+        <Chart testid="chart-school-progress" title="School-wise Course Progress %" data={c.school_progress} onClick={drill("school_progress", "Progress in school")} subtitle="Click a bar to see the students" />
         <Chart testid="chart-monthly-progress" title="Monthly Course Progress %" type="line" data={c.monthly_progress} />
-        <Chart testid="chart-course-completion" title="Course Completion Split" type="pie" data={c.course_completion} />
+        <Chart testid="chart-course-completion" title="Course Completion Split" type="pie" data={c.course_completion} onClick={drill("course_completion", "Courses")} />
       </div>
 
       <Panel title="Low Attendance Students (below 75%)" testid="low-attendance-panel">
@@ -81,6 +82,7 @@ export default function Dashboard() {
           { key: "attendance_pct", label: "Attendance %", render: (r) => <Progress value={r.attendance_pct} /> },
         ]} />
       </Panel>
+      {drillDialog}
     </div>
   );
 }

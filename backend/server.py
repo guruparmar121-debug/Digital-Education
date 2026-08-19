@@ -86,6 +86,9 @@ async def startup():
     await db.attendance.create_index([("student_id", 1), ("date", 1), ("academic_year_id", 1)], unique=True)
     await db.attendance.create_index([("academic_year_id", 1), ("school_id", 1)])
     await db.student_courses.create_index([("student_id", 1), ("course_id", 1), ("academic_year_id", 1)], unique=True)
+    await db.student_lessons.create_index(
+        [("student_id", 1), ("course_id", 1), ("academic_year_id", 1), ("lesson_id", 1)], unique=True)
+    await db.course_lessons.create_index([("course_id", 1), ("order", 1)])
     await db.academic_years.create_index("year", unique=True)
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@dep.org")
     admin = await db.users.find_one({"email": admin_email})
