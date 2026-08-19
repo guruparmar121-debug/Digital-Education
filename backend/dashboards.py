@@ -1,8 +1,24 @@
+import io
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
+import pandas as pd
 from collections import defaultdict
 from core import db, get_current_user
 
 router = APIRouter()
+
+APP_NAME = "DIGITAL EDUCATION PROGRAM"
+APP_SUB = "Student Attendance & Learning Management System"
+
+DRILLDOWN_COLUMNS = [
+    ("student_id", "Student ID"), ("name", "Student Name"), ("gender", "Gender"),
+    ("standard", "Class"), ("division", "Division"), ("school_name", "School"),
+    ("block_name", "Block"), ("parent_mobile", "Parent Mobile"),
+    ("working_days", "Working Days"), ("present", "Present"), ("absent", "Absent"),
+    ("attendance_pct", "Attendance %"), ("courses", "Courses"),
+    ("avg_progress_pct", "Avg Progress %"),
+]
 
 
 async def gather(academic_year_id: str, block_id="", village_id="", school_id="", standard="",
@@ -220,6 +236,35 @@ async def drilldown(chart: str, label: str, academic_year_id: str, block_id: str
         })
     keep.sort(key=lambda r: r["name"])
     return {"chart": chart, "label": label, "count": len(keep), "rows": keep}
+
+
+@router.get("/dashboard/drilldown/export")
+async def drilldown_export(chart: str, label: str, academic_year_id: str, block_id: str = "",
+                           village_id: str = "", school_id: str = "", standard: str = "", gender: str = "",
+                           course_id: str = "", date_from: str = "", date_to: str = "",
+                           title: str = "", user: dict = Depends(get_current_user)):
+    """Excel export of the exact student records behind a clicked chart point."""
+    data = await drilldown(chart, label, academic_year_id, block_id, village_id, school_id,
+                          standard, gender, course_id, date_from, date_to, user)
+    year = await db.academic_years.find_one({"id": academic_year_id}, {"_id": 0}) or {}
+    rows = [{label_txt: r.get(key, "") for key, label_txt in DRILLDOWN_COLUMNS} for r in data["rows"]]
+    if not rows:
+        rows = [{"Message": "No student records behind this data point"}]
+    heading = f"{title or chart.replace('_', ' ').title()} — {label}"
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as w:
+        pd.DataFrame([{"A": APP_NAME}, {"A": APP_SUB}, {"A": heading},
+                      {"A": f"Academic Year: {year.get('year', '')}"},
+                      {"A": f"Date Range: {date_from or 'All'} to {date_to or 'All'}"},
+                      {"A": f"Records: {data['count']}"},
+                      {"A": f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}"}]
+                     ).to_excel(w, index=False, header=False, sheet_name="Drilldown", startrow=0)
+        pd.DataFrame(rows).to_excel(w, index=False, sheet_name="Drilldown", startrow=8)
+    buf.seek(0)
+    safe = "".join(c if c.isalnum() else "_" for c in f"{chart}_{label}")[:60]
+    return StreamingResponse(
+        buf, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=drilldown_{safe}.xlsx"})
 
 
 @router.get("/dashboard/course-progress")
