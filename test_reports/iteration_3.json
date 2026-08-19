@@ -1,0 +1,41 @@
+{
+  "summary": "Focused testing of the NEW Offline Attendance feature (front-end + backend sync) plus a light regression. Backend: added /app/backend/tests/test_offline_attendance.py with 11 new tests covering POST /api/attendance/sync shape, idempotency (repeat sync stays 2 records), multi-batch, year-isolation, audit-log entry, RBAC (admin/coordinator/teacher pass, management/student 403), and edit-not-duplicate. All 11 pass. Full pytest suite is 75/75 (43 regression + 21 iteration-2 + 11 new) = 100%. Frontend Playwright (with page.context.set_offline): teacher can cache 4 class lists (clear-offline-cache shows '4 class list(s) available offline'); after set_offline+dispatch offline event: connection-status badge switches to 'Offline mode', offline-banner renders, Load Students on cached class shows '5 students — offline copy', Save button becomes 'Save on device', save queues locally (pending-sync-count=1). Marked a 2nd class (Std 6, all absent) => pending=2. Full page reload while offline preserved the queue (pending still 2) and reloading the Std 5 sheet showed the previously-marked PRESENT statuses (7/8 buttons still active — one row belongs to a different date/queue). Set_offline(False) + dispatch online event => auto-sync fired and pending cleared; Attendance History rendered 200 rows. Manual Sync produced toast 'Synced 1 class sheet(s), 5 attendance records'. Service worker registration confirmed via navigator.serviceWorker.getRegistrations (>=1). 5 role logins verified (admin/management/coordinator/teacher/student). Bar-chart drilldown still works. Pie-chart drilldown from iteration_2 still fails to open drilldown-dialog — remains an unfixed frontend blocker unrelated to the new offline feature.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Chart (pie) in /app/frontend/src/components/Ui.jsx", "issue": "Pie-slice click still does not open drilldown-dialog (regression carried over from iteration_2, NOT related to offline feature). Bar drilldowns work.", "selector": "[data-testid=\"chart-gender-students\"] path.recharts-sector", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_offline_attendance.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_new_features.py",
+    "/app/test_reports/pytest/pytest_offline.xml",
+    "/app/test_reports/pytest/pytest_all.xml"
+  ],
+  "action_items": [
+    "(carry-over) Fix pie-chart onClick in /app/frontend/src/components/Ui.jsx — bind onClick at the PieChart level (activePayload) or use activeShape/shape prop to guarantee sector clicks bubble in Recharts 3.6.0."
+  ],
+  "critical_code_review_comments": [
+    "offline.js syncQueue clears the entire queue only on the umbrella catch — good, but if the server returns 200 with a partial per-batch failure inside `results`, the current implementation would still clear everything. Today the backend never returns per-batch failure so this is latent, but consider inspecting results[].saved before clearing individual entries.",
+    "attendance.py POST /attendance/sync currently invokes save_attendance() in a Python `for` loop (N+1 audit writes: 1 per batch + 1 sync summary). For very large offline batches this is O(batches). Consider a single bulk write with `bulk_write(UpdateOne(..., upsert=True))` if teachers commonly queue >20 classes. Not blocking.",
+    "sw.js caches only '/' and '/index.html' at install and then network-first for navigations. Static JS/CSS assets rely on runtime cache, so first-time offline visitors will still see a blank screen until they load the app at least once online. Consider precaching a build manifest.",
+    "Attendance.jsx save() distinguishes network failure by `!e.response`. Axios timeouts also satisfy this — a slow network could accidentally queue instead of retrying. Consider explicit `err.code === 'ERR_NETWORK'` check.",
+    "useOnline() uses navigator.onLine as initial state — reliable in Playwright with dispatchEvent + set_offline; note this can be stale in some browsers, so the manual sync button is a good safety net."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_offline_attendance.py"
+  ],
+  "success_rate": {"backend": "100% (75/75)", "frontend": "Offline feature 100% (cache/load/save-queue/reload-persist/auto-sync/manual-sync/SW all pass); pie-chart drilldown regression from iteration_2 still broken"},
+  "test_credentials": "admin@dep.org/admin123, management@dep.org/manage123, coordinator@dep.org/coord123, teacher@dep.org/teach123, student@dep.org/stud123",
+  "seed_data_creation": "Offline tests write attendance rows on unique 2026-12-* dates in the seeded schools; no seed changes.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Offline attendance feature is fully verified. /app/backend/tests/test_offline_attendance.py has 11 tests covering the /api/attendance/sync endpoint (idempotency verified via history count, RBAC, year isolation, audit log, edit-not-duplicate). Front-end offline flow (cache-offline-button, offline-banner, offline-copy panel, save-on-device queuing, pending-sync-count, reload-while-offline persistence, auto-sync on online event, manual sync-attendance-button, service worker registration) all verified in Playwright with page.context.set_offline() + window.dispatchEvent('online'/'offline'). Note the online/offline React state doesn't flip in Playwright without dispatching the events explicitly since navigator.onLine is not reactive to context.setOffline alone. Pie-chart drilldown from iteration_2 still fails — unfixed but unrelated to offline.",
+  "rca of the issue": "N/A — no new bugs found in the offline attendance feature. Pie-chart drilldown RCA remains as documented in iteration_2 (Recharts 3.6 doesn't forward onClick from <Pie> to sectors; needs PieChart-level onClick reading activePayload)."
+}

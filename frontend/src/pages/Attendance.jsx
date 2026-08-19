@@ -7,7 +7,11 @@ import Filters, { useMasters, STANDARDS, Select } from "@/components/Filters";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { CheckCircle2, XCircle, Save, Percent, Users, FileSpreadsheet } from "lucide-react";
+import { CheckCircle2, XCircle, Save, Percent, Users, FileSpreadsheet, Wifi, WifiOff, CloudUpload, HardDriveDownload } from "lucide-react";
+import {
+  useOnline, cacheRoster, getCachedRoster, cachedRosterCount, queueBatch, queueCount,
+  getQueuedBatch, syncQueue, clearRosters,
+} from "@/lib/offline";
 
 export default function Attendance() {
   const { yearId, year } = useYear();
@@ -28,20 +32,84 @@ export default function Attendance() {
   const [history, setHistory] = useState([]);
   const [low, setLow] = useState([]);
   const [threshold, setThreshold] = useState(75);
+  const online = useOnline();
+  const [pending, setPending] = useState(queueCount());
+  const [cachedClasses, setCachedClasses] = useState(cachedRosterCount());
+  const [syncing, setSyncing] = useState(false);
+  const [offlineSheet, setOfflineSheet] = useState(false);
+
+  const doSync = useCallback(async (silent) => {
+    if (!queueCount()) {
+      if (!silent) toast.info("Nothing pending — all attendance is already synced");
+      return;
+    }
+    setSyncing(true);
+    const res = await syncQueue(api);
+    setSyncing(false);
+    setPending(queueCount());
+    if (res.failed) toast.error("Sync failed — your marks are safe on this device, will retry");
+    else toast.success(`Synced ${res.synced} class sheet(s), ${res.saved} attendance records`);
+  }, []);
+
+  useEffect(() => {
+    const onUp = () => doSync(true);
+    window.addEventListener("online", onUp);
+    if (navigator.onLine && queueCount()) doSync(true);
+    return () => window.removeEventListener("online", onUp);
+  }, [doSync]);
 
   useEffect(() => { if (user?.role === "teacher" && user.school_id) setSchoolId(user.school_id); }, [user]);
 
   const loadSheet = async () => {
     if (!schoolId || !standard) { toast.error("Select school and standard"); return; }
+    const params = { academic_year_id: yearId, date, school_id: schoolId, standard };
+    const queued = getQueuedBatch(params);
     setLoading(true);
     try {
-      const { data } = await api.get("/attendance/sheet", {
-        params: { academic_year_id: yearId, date, school_id: schoolId, standard },
-      });
-      setSheet(data);
+      const { data } = await api.get("/attendance/sheet", { params });
+      cacheRoster(params, data.students.map(({ status, ...s }) => s));
+      setCachedClasses(cachedRosterCount());
+      setOfflineSheet(false);
+      setSheet(queued
+        ? { ...data, students: data.students.map((s) => ({
+            ...s, status: queued.records.find((r) => r.student_id === s.student_id)?.status || s.status })) }
+        : data);
       if (data.students.length === 0) toast.info("No students found for this school/class");
-    } catch (e) { toast.error(errMsg(e.response?.data?.detail)); }
+    } catch (e) {
+      const cached = getCachedRoster(params);
+      if (cached) {
+        setOfflineSheet(true);
+        setSheet({
+          already_marked: !!queued, offline: true,
+          students: cached.students.map((s) => ({
+            ...s, status: queued?.records.find((r) => r.student_id === s.student_id)?.status || "" })),
+        });
+        toast.info("Offline — loaded this class from the copy saved on this device");
+      } else {
+        toast.error(online ? errMsg(e.response?.data?.detail)
+          : "You are offline and this class was not saved for offline use yet");
+      }
+    }
     setLoading(false);
+  };
+
+  const cacheForOffline = async () => {
+    if (!schoolId) { toast.error("Select a school first"); return; }
+    setLoading(true);
+    let done = 0;
+    for (const std of STANDARDS) {
+      const params = { academic_year_id: yearId, date, school_id: schoolId, standard: std };
+      try {
+        const { data } = await api.get("/attendance/sheet", { params });
+        if (data.students.length) {
+          cacheRoster(params, data.students.map(({ status, ...s }) => s));
+          done += 1;
+        }
+      } catch (e) { /* skip class */ }
+    }
+    setCachedClasses(cachedRosterCount());
+    setLoading(false);
+    toast.success(`${done} class list(s) saved on this device for offline marking`);
   };
 
   const setAll = (status) => setSheet({ ...sheet, students: sheet.students.map((s) => ({ ...s, status })) });
@@ -51,14 +119,21 @@ export default function Attendance() {
   const save = async () => {
     const records = sheet.students.filter((s) => s.status).map((s) => ({ student_id: s.student_id, status: s.status }));
     if (!records.length) { toast.error("Mark at least one student"); return; }
+    const batch = { academic_year_id: yearId, date, school_id: schoolId, standard, division: "", records };
     setSaving(true);
     try {
-      const { data } = await api.post("/attendance", {
-        academic_year_id: yearId, date, school_id: schoolId, standard, division: "", records,
-      });
+      const { data } = await api.post("/attendance", batch);
       toast.success(`Attendance saved for ${data.saved} students`);
       loadSheet();
-    } catch (e) { toast.error(errMsg(e.response?.data?.detail)); }
+    } catch (e) {
+      const isNetwork = !e.response;
+      if (isNetwork) {
+        setPending(queueBatch(batch));
+        toast.success(`Saved on this device — ${records.length} students will sync when you are back online`);
+      } else {
+        toast.error(errMsg(e.response?.data?.detail));
+      }
+    }
     setSaving(false);
   };
 
@@ -86,7 +161,38 @@ export default function Attendance() {
 
   return (
     <div>
-      <PageTitle title="Daily Attendance" subtitle={`Academic Year ${year?.year || ""}`} />
+      <PageTitle title="Daily Attendance" subtitle={`Academic Year ${year?.year || ""}`}>
+        <span data-testid="connection-status"
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wide border ${
+            online ? "bg-emerald-50 text-emerald-800 border-emerald-200" : "bg-amber-50 text-amber-800 border-amber-200"}`}>
+          {online ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
+          {online ? "Online" : "Offline mode"}
+        </span>
+        {pending > 0 && (
+          <Button size="sm" data-testid="sync-attendance-button" disabled={syncing || !online}
+            className="bg-amber-600 hover:bg-amber-700" onClick={() => doSync(false)}>
+            <CloudUpload className="h-4 w-4 mr-1.5" />
+            <span data-testid="pending-sync-count">{pending}</span> pending — Sync now
+          </Button>
+        )}
+      </PageTitle>
+
+      {!online && (
+        <div data-testid="offline-banner"
+          className="mb-6 flex flex-wrap items-center gap-2 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-900">
+          <WifiOff className="h-4 w-4" />
+          <span className="font-semibold">No internet.</span>
+          You can still mark attendance for the {cachedClasses} class list(s) saved on this device — everything syncs automatically once you are back online.
+        </div>
+      )}
+      {online && pending > 0 && (
+        <div data-testid="pending-banner"
+          className="mb-6 flex flex-wrap items-center gap-2 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-900">
+          <CloudUpload className="h-4 w-4" />
+          <span className="font-semibold">{pending} class sheet(s) marked offline</span> are waiting to sync.
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2 mb-6">
         {tabs.map(([t, label]) => (
           <button key={t} data-testid={`attendance-tab-${t}`} onClick={() => setTab(t)}
@@ -110,12 +216,22 @@ export default function Attendance() {
               <Select testid="attendance-standard" label="Standard" value={standard} onChange={setStandard} placeholder="Select class"
                 options={STANDARDS.map((s) => ({ value: s, label: `Std ${s}` }))} />
               <Button data-testid="load-attendance-button" className="h-9 bg-emerald-700 hover:bg-emerald-800" onClick={loadSheet}>Load Students</Button>
+              <Button data-testid="cache-offline-button" variant="outline" className="h-9" disabled={!online || loading}
+                onClick={cacheForOffline}>
+                <HardDriveDownload className="h-4 w-4 mr-1.5" /> Save school for offline
+              </Button>
+              {cachedClasses > 0 && (
+                <button data-testid="clear-offline-cache" onClick={() => { clearRosters(); setCachedClasses(0); toast.success("Offline class lists cleared"); }}
+                  className="h-9 text-xs font-semibold text-slate-500 hover:text-rose-600 underline">
+                  {cachedClasses} class list(s) available offline — clear
+                </button>
+              )}
             </div>
           </Panel>
 
           {loading ? <Spinner /> : sheet && (
             <Panel testid="attendance-sheet-panel"
-              title={`${sheet.students.length} students${sheet.already_marked ? " — already marked (editing)" : ""}`}
+              title={`${sheet.students.length} students${sheet.already_marked ? " — already marked (editing)" : ""}${offlineSheet ? " — offline copy" : ""}`}
               action={
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" variant="outline" data-testid="mark-all-present" onClick={() => setAll("present")}>
@@ -126,7 +242,7 @@ export default function Attendance() {
                   </Button>
                   <Button size="sm" data-testid="save-attendance-button" disabled={saving}
                     className="bg-emerald-700 hover:bg-emerald-800" onClick={save}>
-                    <Save className="h-4 w-4 mr-1.5" /> Save Attendance
+                    <Save className="h-4 w-4 mr-1.5" /> {online ? "Save Attendance" : "Save on device"}
                   </Button>
                 </div>
               }>

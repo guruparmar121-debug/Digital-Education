@@ -69,6 +69,34 @@ async def save_attendance(payload: AttendanceIn, user: dict = Depends(require_ro
     return {"saved": saved}
 
 
+class SyncBatch(BaseModel):
+    academic_year_id: str
+    date: str
+    school_id: str
+    standard: str
+    division: Optional[str] = ""
+    records: List[AttendanceMark]
+
+
+class SyncIn(BaseModel):
+    batches: List[SyncBatch]
+
+
+@router.post("/attendance/sync")
+async def sync_offline_attendance(payload: SyncIn,
+                                 user: dict = Depends(require_roles("admin", "coordinator", "teacher"))):
+    """Accept attendance batches captured offline. Idempotent per student+date+year."""
+    saved_total, results = 0, []
+    for batch in payload.batches:
+        res = await save_attendance(AttendanceIn(**batch.model_dump()), user)
+        saved_total += res["saved"]
+        results.append({"date": batch.date, "school_id": batch.school_id,
+                        "standard": batch.standard, "saved": res["saved"]})
+    await audit(user, "sync_offline_attendance", "attendance", "", None,
+                {"batches": len(payload.batches), "records": saved_total})
+    return {"batches_synced": len(payload.batches), "records_saved": saved_total, "results": results}
+
+
 @router.get("/attendance/history")
 async def attendance_history(academic_year_id: str, school_id: str = "", standard: str = "",
                              student_id: str = "", date_from: str = "", date_to: str = "",
